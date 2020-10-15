@@ -216,18 +216,24 @@ static int BFCheck_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, i
     return REDISMODULE_OK;
 }
 
+// 增加一位bloom的值
 static int bfInsertCommon(RedisModuleCtx *ctx, RedisModuleString *keystr, RedisModuleString **items,
                           size_t nitems, const BFInsertOptions *options) {
     RedisModuleKey *key = RedisModule_OpenKey(ctx, keystr, REDISMODULE_READ | REDISMODULE_WRITE);
+    // *sb 作为引用传递,将在调用bfGetChain后得到数据
     SBChain *sb;
+    // 获取当前ket 所在的 bloom结构体
     const int status = bfGetChain(key, &sb);
 
+    // 如果不存在,那么检查是否配置了自动创建的配置
+    // 配置了自动创建,那么当这个 SBChain为空的时候,就会创建一个新的数据出去
     if (status == SB_EMPTY && options->autocreate) {
         sb = bfCreateChain(key, options->error_rate, options->capacity, options->expansion,
                            options->nonScaling);
         if (sb == NULL) {
             return RedisModule_ReplyWithError(ctx, "ERR could not create filter"); // LCOV_EXCL_LINE
         }
+        // 如果当前的状态不是正常的,那么就抛出异常
     } else if (status != SB_OK) {
         return RedisModule_ReplyWithError(ctx, statusStrerror(status));
     }
@@ -236,15 +242,21 @@ static int bfInsertCommon(RedisModuleCtx *ctx, RedisModuleString *keystr, RedisM
         RedisModule_ReplyWithArray(ctx, REDISMODULE_POSTPONED_ARRAY_LEN);
     }
 
+    // 是时候展示真正的技术的时候啦
     size_t array_len = 0;
     int rv = 0;
+    // 循环遍历多个item 数据,一般情况下,使用一个item就可以了
     for (size_t ii = 0; ii < nitems && rv != -2; ++ii) {
         size_t n;
+        // 获取当前的item 数据
         const char *s = RedisModule_StringPtrLen(items[ii], &n);
+        // 添加item数据到 bloom过滤器结构体中
         rv = SBChain_Add(sb, s, n);
+        // 添加失败, 给出错误信息
         if (rv == -2) { // decide if to make into an error
             RedisModule_ReplyWithError(ctx, "ERR non scaling filter is full");
         } else {
+            // 如果添加成功, 重放到longlong 类型的里面去
             RedisModule_ReplyWithLongLong(ctx, !!rv);
         }
         array_len++;
@@ -263,7 +275,9 @@ static int bfInsertCommon(RedisModuleCtx *ctx, RedisModuleString *keystr, RedisM
  * Returns an array of integers. The nth element is either 1 or 0 depending on whether it was newly
  * added, or had previously existed, respectively.
  */
+// 增加一个bloom key 的过滤
 static int BFAdd_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) {
+    // 自动分配当前bloom过滤器模块的内存
     RedisModule_AutoMemory(ctx);
     BFInsertOptions options = {.capacity = BFDefaultInitCapacity,
                                .error_rate = BFDefaultErrorRate,
@@ -275,6 +289,8 @@ static int BFAdd_RedisCommand(RedisModuleCtx *ctx, RedisModuleString **argv, int
     if ((options.is_multi && argc < 3) || (!options.is_multi && argc != 3)) {
         return RedisModule_WrongArity(ctx);
     }
+    // bloom 增加一位 item的数据
+    // 为什么地址需要偏移两位???
     return bfInsertCommon(ctx, argv[1], argv + 2, argc - 2, &options);
 }
 
@@ -1254,8 +1270,13 @@ int RedisModule_OnLoad(RedisModuleCtx *ctx, RedisModuleString **argv, int argc) 
 #define CREATE_WRCMD(name, tgt) CREATE_CMD(name, tgt, "write deny-oom")
 #define CREATE_ROCMD(name, tgt) CREATE_CMD(name, tgt, "readonly fast")
 
+
+    // 创建redis bloom 的命令 处理器
+    // bloom充值
     CREATE_WRCMD("bf.reserve", BFReserve_RedisCommand);
+    // bloom 增加 key
     CREATE_WRCMD("bf.add", BFAdd_RedisCommand);
+    // bloom 增加 key
     CREATE_WRCMD("bf.madd", BFAdd_RedisCommand);
     CREATE_WRCMD("bf.insert", BFInsert_RedisCommand);
     CREATE_ROCMD("bf.exists", BFCheck_RedisCommand);

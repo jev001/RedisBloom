@@ -53,8 +53,10 @@ static bloom_hashval SBChain_GetHash(const SBChain *chain, const void *buf, size
     }
 }
 
+// 往bloom 数据结构中添加一个数据
 int SBChain_Add(SBChain *sb, const void *data, size_t len) {
     // Does it already exist?
+    // 获取 当前数据的hash值
     bloom_hashval h = SBChain_GetHash(sb, data, len);
     for (int ii = sb->nfilters - 1; ii >= 0; --ii) {
         if (bloom_check_h(&sb->filters[ii].inner, h)) {

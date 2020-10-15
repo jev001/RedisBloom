@@ -14,6 +14,7 @@ typedef struct SBLink {
     size_t size;        // < Number of items in the link
 } SBLink;
 
+// bloom过滤器存储的值, 这里面有对当前的数据进行过滤的操作
 /** A chain of one or more bloom filters */
 typedef struct SBChain {
     SBLink *filters;  //< Current filter
