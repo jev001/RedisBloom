@@ -14,6 +14,7 @@
     return REDISMODULE_ERR;                                             \
   }
 
+// 将redis module 中的指令注册到 redis server中
 #define __rmutil_register_cmd(ctx, cmd, f, mode)                                \
   if (RedisModule_CreateCommand(ctx, cmd, f, mode, 1, 1, 1) == REDISMODULE_ERR) \
     return REDISMODULE_ERR;
