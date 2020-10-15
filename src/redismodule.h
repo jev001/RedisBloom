@@ -1,3 +1,4 @@
+// redis hook函数
 #ifndef REDISMODULE_H
 #define REDISMODULE_H
 
