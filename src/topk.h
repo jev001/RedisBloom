@@ -32,6 +32,7 @@
 
 typedef uint32_t counter_t;
 
+// 完全队列,堆排,堆桶
 typedef struct HeapBucket {
     uint32_t fp;
     uint32_t itemlen;
